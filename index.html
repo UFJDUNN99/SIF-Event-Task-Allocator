@@ -16,43 +16,42 @@
 
     <script type="text/babel">
         function App() {
-            // Manage custom departments state
-            const [departments, setDepartments] = React.useState(['Electrical', 'Plumbing', 'HVAC', 'General Maintenance']);
-            const [newDeptInput, setNewDeptInput] = React.useState('');
+            // Persistent State with LocalStorage
+            const [departments, setDepartments] = React.useState(() => {
+                const saved = localStorage.getItem('fj_departments');
+                return saved ? JSON.parse(saved) : ['Electrical', 'Plumbing', 'HVAC', 'General Maintenance'];
+            });
 
-            const [jobs, setJobs] = React.useState([
-                { 
-                    id: 1, 
-                    title: 'Fix HVAC Unit #4', 
-                    client: 'Acme Corp', 
-                    location: '123 Industrial Pkwy', 
-                    priority: 'High', 
-                    status: 'Pending', 
-                    assignedWorkers: [] 
-                },
-                { 
-                    id: 2, 
-                    title: 'Electrical Panel Inspection', 
-                    client: 'Metropolitan Hotel', 
-                    location: '45 Grand Ave', 
-                    priority: 'Medium', 
-                    status: 'Allocated', 
-                    assignedWorkers: [
-                        { name: 'Sarah Jenkins', phone: '+447700900077', department: 'Electrical' }
-                    ] 
-                }
-            ]);
+            const [jobs, setJobs] = React.useState(() => {
+                const saved = localStorage.getItem('fj_jobs');
+                return saved ? JSON.parse(saved) : [
+                    { id: 1, title: 'Fix HVAC Unit #4', client: 'Acme Corp', location: '123 Industrial Pkwy', priority: 'High', status: 'Pending', assignedWorkers: [], createdAt: new Date().toISOString() },
+                    { id: 2, title: 'Electrical Panel Inspection', client: 'Metropolitan Hotel', location: '45 Grand Ave', priority: 'Medium', status: 'Allocated', assignedWorkers: [{ name: 'Sarah Jenkins', phone: '+447700900077', department: 'Electrical' }], createdAt: new Date().toISOString() }
+                ];
+            });
             
-            const [workers, setWorkers] = React.useState([
-                { id: 1, name: 'Sarah Jenkins', phone: '+447700900077', department: 'Electrical' },
-                { id: 2, name: 'Dave Smith', phone: '+447700900088', department: 'Plumbing' },
-                { id: 3, name: 'Elena Rostova', phone: '+447700900099', department: 'HVAC' },
-                { id: 4, name: 'Mark Evans', phone: '+447700900111', department: 'Electrical' }
-            ]);
+            const [workers, setWorkers] = React.useState(() => {
+                const saved = localStorage.getItem('fj_workers');
+                return saved ? JSON.parse(saved) : [
+                    { id: 1, name: 'Sarah Jenkins', phone: '+447700900077', department: 'Electrical' },
+                    { id: 2, name: 'Dave Smith', phone: '+447700900088', department: 'Plumbing' },
+                    { id: 3, name: 'Elena Rostova', phone: '+447700900099', department: 'HVAC' }
+                ];
+            });
 
+            // Save to LocalStorage whenever state changes
+            React.useEffect(() => { localStorage.setItem('fj_departments', JSON.stringify(departments)); }, [departments]);
+            React.useEffect(() => { localStorage.setItem('fj_jobs', JSON.stringify(jobs)); }, [jobs]);
+            React.useEffect(() => { localStorage.setItem('fj_workers', JSON.stringify(workers)); }, [workers]);
+
+            // Form inputs
+            const [newDeptInput, setNewDeptInput] = React.useState('');
             const [newJob, setNewJob] = React.useState({ title: '', client: '', location: '', priority: 'Medium' });
             const [newWorker, setNewWorker] = React.useState({ name: '', phone: '', department: 'Electrical' });
             
+            // Edit Job Modal State
+            const [editingJob, setEditingJob] = React.useState(null);
+
             // Allocation Modal State
             const [allocatingJobId, setAllocatingJobId] = React.useState(null);
             const [selectedDeptFilter, setSelectedDeptFilter] = React.useState('All');
@@ -61,7 +60,7 @@
             const [toast, setToast] = React.useState(null);
             const [selectedWhatsAppList, setSelectedWhatsAppList] = React.useState(null);
 
-            // Add Custom Department
+            // Add / Delete Custom Department
             const handleAddDepartment = (e) => {
                 e.preventDefault();
                 const trimmed = newDeptInput.trim();
@@ -75,7 +74,6 @@
                 showToast(`Department "${trimmed}" added!`);
             };
 
-            // Delete Custom Department
             const handleRemoveDepartment = (deptToRemove) => {
                 if (departments.length <= 1) {
                     showToast("You must keep at least one department.");
@@ -85,13 +83,29 @@
                 showToast(`Department "${deptToRemove}" removed.`);
             };
 
+            // Task Actions: Create, Edit, Delete
             const handleCreateJob = (e) => {
                 e.preventDefault();
                 if (!newJob.title || !newJob.client) return;
-                const job = { id: Date.now(), ...newJob, status: 'Pending', assignedWorkers: [] };
+                const job = { id: Date.now(), ...newJob, status: 'Pending', assignedWorkers: [], createdAt: new Date().toISOString() };
                 setJobs([job, ...jobs]);
                 setNewJob({ title: '', client: '', location: '', priority: 'Medium' });
                 showToast("New job created successfully!");
+            };
+
+            const handleSaveEditJob = (e) => {
+                e.preventDefault();
+                if (!editingJob) return;
+                setJobs(jobs.map(j => j.id === editingJob.id ? editingJob : j));
+                setEditingJob(null);
+                showToast("Job amended successfully!");
+            };
+
+            const handleDeleteJob = (jobId) => {
+                if (confirm("Are you sure you want to delete this job?")) {
+                    setJobs(jobs.filter(j => j.id !== jobId));
+                    showToast("Job deleted.");
+                }
             };
 
             const handleAddWorker = (e) => {
@@ -108,6 +122,7 @@
                 showToast("Worker removed from directory.");
             };
 
+            // Allocation Controls
             const openAllocationModal = (job) => {
                 setAllocatingJobId(job.id);
                 setSelectedWorkerIds(job.assignedWorkers.map(w => w.phone));
@@ -152,6 +167,36 @@
                 showToast(`WhatsApp notifications ready for ${dispatches.length} team member(s)!`);
             };
 
+            // Download CSV Report
+            const downloadCSVReport = () => {
+                if (jobs.length === 0) {
+                    showToast("No jobs available to export.");
+                    return;
+                }
+
+                const headers = ["Job ID", "Title", "Client", "Location", "Priority", "Status", "Assigned Team", "Created Date"];
+                const rows = jobs.map(j => [
+                    `"${j.id}"`,
+                    `"${j.title.replace(/"/g, '""')}"`,
+                    `"${j.client.replace(/"/g, '""')}"`,
+                    `"${j.location.replace(/"/g, '""')}"`,
+                    `"${j.priority}"`,
+                    `"${j.status}"`,
+                    `"${j.assignedWorkers.map(w => `${w.name} (${w.department})`).join('; ')}"`,
+                    `"${new Date(j.createdAt || Date.now()).toLocaleString()}"`
+                ]);
+
+                const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `FieldJob_Report_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast("CSV report downloaded!");
+            };
+
             const showToast = (msg) => {
                 setToast(msg);
                 setTimeout(() => setToast(null), 4000);
@@ -167,13 +212,18 @@
                 <div className="min-h-screen pb-12">
                     {/* Header */}
                     <header className="bg-emerald-700 text-white shadow-md sticky top-0 z-30">
-                        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center flex-wrap gap-2">
                             <div className="flex items-center space-x-2">
                                 <span className="text-2xl font-black tracking-tight">FieldJob WhatsApp</span>
-                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Custom Departments</span>
+                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Reports & Storage</span>
                             </div>
-                            <div className="text-sm bg-emerald-800 px-3 py-1.5 rounded-lg">
-                                Manager: <strong>Admin User</strong>
+                            <div className="flex items-center space-x-2">
+                                <button 
+                                    onClick={downloadCSVReport} 
+                                    className="bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs px-3.5 py-2 rounded-xl border border-emerald-600 shadow-sm flex items-center space-x-1 transition"
+                                >
+                                    <span>📊 Download CSV Report</span>
+                                </button>
                             </div>
                         </div>
                     </header>
@@ -296,57 +346,81 @@
                             </div>
                         </div>
 
-                        {/* Right Column: Job Allocation & WhatsApp Outbox */}
+                        {/* Right Column: Job List & Actions */}
                         <div className="lg:col-span-2 space-y-6">
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                                <div className="flex justify-between items-center mb-4">
+                                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                                     <h2 className="text-lg font-bold text-slate-800">Outstanding & Active Jobs</h2>
-                                    <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold">{jobs.length} Total</span>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={downloadCSVReport} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition">
+                                            📥 Download Report CSV
+                                        </button>
+                                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">{jobs.length} Total</span>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-3">
-                                    {jobs.map(job => (
-                                        <div key={job.id} className="border border-slate-200 rounded-xl p-4 hover:border-emerald-300 transition bg-white shadow-xs">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                                <div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                                                            job.priority === 'Urgent' ? 'bg-rose-100 text-rose-700' :
-                                                            job.priority === 'High' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                                                        }`}>{job.priority}</span>
-                                                        <span className="text-xs font-semibold text-slate-400">ID: #{job.id.toString().slice(-4)}</span>
-                                                        <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                                                            job.status === 'Pending' ? 'bg-slate-100 text-slate-600' :
-                                                            job.status === 'Allocated' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
-                                                        }`}>{job.status}</span>
-                                                    </div>
-                                                    <h3 className="font-bold text-slate-900 mt-1 text-base">{job.title}</h3>
-                                                    <p className="text-xs text-slate-600">🏢 {job.client} • 📍 {job.location}</p>
-                                                    
-                                                    {/* Assigned Team List */}
-                                                    {job.assignedWorkers.length > 0 ? (
-                                                        <div className="mt-2 flex flex-wrap gap-1 items-center">
-                                                            <span className="text-xs font-bold text-slate-500 mr-1">Assigned Team:</span>
-                                                            {job.assignedWorkers.map(w => (
-                                                                <span key={w.phone} className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs px-2 py-0.5 rounded-md font-semibold">
-                                                                    👤 {w.name} ({w.department})
-                                                                </span>
-                                                            ))}
+                                    {jobs.length === 0 ? (
+                                        <div className="p-8 text-center text-slate-400 font-medium">No tasks recorded. Create one on the left to get started!</div>
+                                    ) : (
+                                        jobs.map(job => (
+                                            <div key={job.id} className="border border-slate-200 rounded-xl p-4 hover:border-emerald-300 transition bg-white shadow-xs">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="flex items-center space-x-2">
+                                                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                                                                job.priority === 'Urgent' ? 'bg-rose-100 text-rose-700' :
+                                                                job.priority === 'High' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                                                            }`}>{job.priority}</span>
+                                                            <span className="text-xs font-semibold text-slate-400">ID: #{job.id.toString().slice(-4)}</span>
+                                                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                                                                job.status === 'Pending' ? 'bg-slate-100 text-slate-600' :
+                                                                job.status === 'Allocated' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                                                            }`}>{job.status}</span>
                                                         </div>
-                                                    ) : (
-                                                        <p className="text-xs text-amber-600 font-medium mt-1">⚠️ No team members assigned yet</p>
-                                                    )}
-                                                </div>
+                                                        <h3 className="font-bold text-slate-900 mt-1 text-base">{job.title}</h3>
+                                                        <p className="text-xs text-slate-600">🏢 {job.client} • 📍 {job.location}</p>
+                                                        
+                                                        {/* Assigned Team List */}
+                                                        {job.assignedWorkers.length > 0 ? (
+                                                            <div className="mt-2 flex flex-wrap gap-1 items-center">
+                                                                <span className="text-xs font-bold text-slate-500 mr-1">Assigned Team:</span>
+                                                                {job.assignedWorkers.map(w => (
+                                                                    <span key={w.phone} className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs px-2 py-0.5 rounded-md font-semibold">
+                                                                        👤 {w.name} ({w.department})
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-amber-600 font-medium mt-1">⚠️ No team members assigned yet</p>
+                                                        )}
+                                                    </div>
 
-                                                <button 
-                                                    onClick={() => openAllocationModal(job)}
-                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition whitespace-nowrap self-start sm:self-center"
-                                                >
-                                                    ⚙️ Assign Team Members
-                                                </button>
+                                                    {/* Task Control Buttons: Assign, Amend, Delete */}
+                                                    <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-center">
+                                                        <button 
+                                                            onClick={() => openAllocationModal(job)}
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-xs transition"
+                                                        >
+                                                            ⚙️ Assign Team
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setEditingJob(job)}
+                                                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-3 py-2 rounded-xl border border-slate-300 transition"
+                                                        >
+                                                            ✏️ Amend
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteJob(job.id)}
+                                                            className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-2.5 py-2 rounded-xl border border-rose-200 transition"
+                                                        >
+                                                            🗑️ Delete
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))
+                                    )}
                                 </div>
                             </div>
 
@@ -378,6 +452,42 @@
                         </div>
                     </main>
 
+                    {/* Amend Task Modal */}
+                    {editingJob && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+                                <h3 className="font-bold text-slate-900 text-base mb-4">✏️ Amend Task Details</h3>
+                                <form onSubmit={handleSaveEditJob} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Job Title</label>
+                                        <input type="text" required value={editingJob.title} onChange={e => setEditingJob({...editingJob, title: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Client Name</label>
+                                        <input type="text" required value={editingJob.client} onChange={e => setEditingJob({...editingJob, client: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Location / Address</label>
+                                        <input type="text" required value={editingJob.location} onChange={e => setEditingJob({...editingJob, location: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Priority</label>
+                                        <select value={editingJob.priority} onChange={e => setEditingJob({...editingJob, priority: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                                            <option>Normal</option>
+                                            <option>Medium</option>
+                                            <option>High</option>
+                                            <option>Urgent</option>
+                                        </select>
+                                    </div>
+                                    <div className="pt-2 flex justify-end space-x-2">
+                                        <button type="button" onClick={() => setEditingJob(null)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                                        <button type="submit" className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">Save Changes</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Team Selection Modal */}
                     {allocatingJobId && activeAllocatingJob && (
                         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -390,29 +500,16 @@
                                     <button onClick={() => setAllocatingJobId(null)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
                                 </div>
 
-                                {/* Department Filter Buttons */}
                                 <div className="py-3">
                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Filter Workers by Department:</label>
                                     <div className="flex flex-wrap gap-1.5">
-                                        <button 
-                                            onClick={() => setSelectedDeptFilter('All')} 
-                                            className={`text-xs px-3 py-1.5 rounded-lg font-bold transition ${selectedDeptFilter === 'All' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                                        >
-                                            All Depts
-                                        </button>
+                                        <button onClick={() => setSelectedDeptFilter('All')} className={`text-xs px-3 py-1.5 rounded-lg font-bold transition ${selectedDeptFilter === 'All' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>All Depts</button>
                                         {departments.map(dept => (
-                                            <button 
-                                                key={dept} 
-                                                onClick={() => setSelectedDeptFilter(dept)} 
-                                                className={`text-xs px-3 py-1.5 rounded-lg font-bold transition ${selectedDeptFilter === dept ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-                                            >
-                                                {dept}
-                                            </button>
+                                            <button key={dept} onClick={() => setSelectedDeptFilter(dept)} className={`text-xs px-3 py-1.5 rounded-lg font-bold transition ${selectedDeptFilter === dept ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>{dept}</button>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* Worker Checkbox List */}
                                 <div className="flex-1 overflow-y-auto space-y-2 py-2 pr-1">
                                     <label className="block text-xs font-bold text-slate-500 uppercase">Select Team Members:</label>
                                     {filteredWorkers.length === 0 ? (
@@ -429,12 +526,7 @@
                                                     }`}
                                                 >
                                                     <div className="flex items-center space-x-3">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={isChecked} 
-                                                            onChange={() => {}} 
-                                                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
-                                                        />
+                                                        <input type="checkbox" checked={isChecked} onChange={() => {}} className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" />
                                                         <div>
                                                             <p className="text-xs font-bold text-slate-900">{w.name}</p>
                                                             <p className="text-[11px] text-slate-500">{w.phone}</p>
@@ -447,14 +539,9 @@
                                     )}
                                 </div>
 
-                                {/* Modal Actions */}
                                 <div className="pt-4 border-t border-slate-100 flex justify-end space-x-2">
-                                    <button onClick={() => setAllocatingJobId(null)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">
-                                        Cancel
-                                    </button>
-                                    <button onClick={saveJobAssignments} className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">
-                                        Save & Dispatch WhatsApp ({selectedWorkerIds.length})
-                                    </button>
+                                    <button onClick={() => setAllocatingJobId(null)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                                    <button onClick={saveJobAssignments} className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md">Save & Dispatch WhatsApp ({selectedWorkerIds.length})</button>
                                 </div>
                             </div>
                         </div>
