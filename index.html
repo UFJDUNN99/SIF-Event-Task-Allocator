@@ -1,3 +1,4 @@
+HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -24,13 +25,14 @@
                 { id: 3, title: 'Emergency Plumbing Leak', client: 'Central Station', location: '8 Station Rd', priority: 'Urgent', status: 'In Progress', worker: 'Dave Smith', phone: '+447700900088' },
             ]);
             
-            const [workers] = React.useState([
-                { name: 'Sarah Jenkins', phone: '+447700900077' },
-                { name: 'Dave Smith', phone: '+447700900088' },
-                { name: 'Elena Rostova', phone: '+447700900099' }
+            const [workers, setWorkers] = React.useState([
+                { id: 1, name: 'Sarah Jenkins', phone: '+447700900077' },
+                { id: 2, name: 'Dave Smith', phone: '+447700900088' },
+                { id: 3, name: 'Elena Rostova', phone: '+447700900099' }
             ]);
 
             const [newJob, setNewJob] = React.useState({ title: '', client: '', location: '', priority: 'Medium' });
+            const [newWorker, setNewWorker] = React.useState({ name: '', phone: '' });
             const [toast, setToast] = React.useState(null);
             const [selectedWhatsApp, setSelectedWhatsApp] = React.useState(null);
 
@@ -43,8 +45,22 @@
                 showToast("New job created successfully!");
             };
 
+            const handleAddWorker = (e) => {
+                e.preventDefault();
+                if (!newWorker.name || !newWorker.phone) return;
+                setWorkers([...workers, { id: Date.now(), ...newWorker }]);
+                setNewWorker({ name: '', phone: '' });
+                showToast(`Worker ${newWorker.name} added to directory!`);
+            };
+
+            const removeWorker = (id) => {
+                setWorkers(workers.filter(w => w.id !== id));
+                showToast("Worker removed from directory.");
+            };
+
             const assignWorker = (jobId, workerName) => {
                 const worker = workers.find(w => w.name === workerName);
+                if (!worker) return;
                 setJobs(jobs.map(j => {
                     if (j.id === jobId) {
                         const updated = { ...j, status: 'Allocated', worker: workerName, phone: worker.phone };
@@ -58,7 +74,7 @@
             const triggerWhatsApp = (job) => {
                 const message = `📋 *NEW JOB ALLOCATED*\n\n*Task:* ${job.title}\n*Client:* ${job.client}\n*Location:* ${job.location}\n*Priority:* ${job.priority}\n\nPlease reply ACK to accept.`;
                 setSelectedWhatsApp({ worker: job.worker, phone: job.phone, message });
-                showToast(`WhatsApp notification sent to ${job.worker}!`);
+                showToast(`WhatsApp notification triggered for ${job.worker}!`);
             };
 
             const showToast = (msg) => {
@@ -89,42 +105,80 @@
                     )}
 
                     <main className="max-w-7xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Left Column: Quick Job Entry Form */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
-                            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
-                                <span className="bg-emerald-100 text-emerald-800 p-2 rounded-lg mr-2 text-sm">➕</span>
-                                Create & Allocate Job
-                            </h2>
-                            <form onSubmit={handleCreateJob} className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Job Title / Task</label>
-                                    <input type="text" required placeholder="e.g. Fix water pump" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                        {/* Left Column: Forms (Create Job & Manage Workers) */}
+                        <div className="space-y-6">
+                            {/* Create Job Card */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                    <span className="bg-emerald-100 text-emerald-800 p-2 rounded-lg mr-2 text-sm">➕</span>
+                                    Create & Allocate Job
+                                </h2>
+                                <form onSubmit={handleCreateJob} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Job Title / Task</label>
+                                        <input type="text" required placeholder="e.g. Fix water pump" value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Client Name</label>
+                                        <input type="text" required placeholder="e.g. Acme Corp" value={newJob.client} onChange={e => setNewJob({...newJob, client: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Location / Address</label>
+                                        <input type="text" required placeholder="e.g. 14 Baker St" value={newJob.location} onChange={e => setNewJob({...newJob, location: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Priority</label>
+                                        <select value={newJob.priority} onChange={e => setNewJob({...newJob, priority: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                                            <option>Normal</option>
+                                            <option>Medium</option>
+                                            <option>High</option>
+                                            <option>Urgent</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-200">
+                                        Publish Job
+                                    </button>
+                                </form>
+                            </div>
+
+                            {/* Manage Workers Card */}
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                                <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                                    <span className="bg-blue-100 text-blue-800 p-2 rounded-lg mr-2 text-sm">👷</span>
+                                    Worker Directory
+                                </h2>
+                                <form onSubmit={handleAddWorker} className="space-y-3 mb-4 pb-4 border-b border-slate-100">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Worker Name</label>
+                                        <input type="text" required placeholder="e.g. John Doe" value={newWorker.name} onChange={e => setNewWorker({...newWorker, name: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp Phone (with Country Code)</label>
+                                        <input type="text" required placeholder="e.g. +447700900123" value={newWorker.phone} onChange={e => setNewWorker({...newWorker, phone: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    </div>
+                                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition duration-200 text-sm">
+                                        Add Worker
+                                    </button>
+                                </form>
+
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                    {workers.map(w => (
+                                        <div key={w.id} className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
+                                            <div>
+                                                <p className="font-bold text-slate-800">{w.name}</p>
+                                                <p className="text-slate-500 font-mono">{w.phone}</p>
+                                            </div>
+                                            <button onClick={() => removeWorker(w.id)} className="text-rose-600 hover:text-rose-800 font-bold px-2 py-1">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Client Name</label>
-                                    <input type="text" required placeholder="e.g. Acme Corp" value={newJob.client} onChange={e => setNewJob({...newJob, client: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Location / Address</label>
-                                    <input type="text" required placeholder="e.g. 14 Baker St" value={newJob.location} onChange={e => setNewJob({...newJob, location: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Priority</label>
-                                    <select value={newJob.priority} onChange={e => setNewJob({...newJob, priority: e.target.value})} className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
-                                        <option>Normal</option>
-                                        <option>Medium</option>
-                                        <option>High</option>
-                                        <option>Urgent</option>
-                                    </select>
-                                </div>
-                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-200">
-                                    Publish Job
-                                </button>
-                            </form>
+                            </div>
 
                             {/* WhatsApp Simulator Preview Box */}
                             {selectedWhatsApp && (
-                                <div className="mt-6 bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
+                                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl">
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-xs font-bold text-emerald-800 uppercase flex items-center">
                                             📱 WhatsApp Outbox Preview
@@ -167,6 +221,9 @@
                                                     </div>
                                                     <h3 className="font-bold text-slate-900 mt-1 text-base">{job.title}</h3>
                                                     <p className="text-xs text-slate-600">🏢 {job.client} • 📍 {job.location}</p>
+                                                    {job.worker && (
+                                                        <p className="text-xs text-emerald-700 font-semibold mt-1">Assigned to: {job.worker} ({job.phone})</p>
+                                                    )}
                                                 </div>
 
                                                 {/* Assignment Controls */}
@@ -178,7 +235,7 @@
                                                     >
                                                         <option value="" disabled>Assign Worker...</option>
                                                         {workers.map(w => (
-                                                            <option key={w.name} value={w.name}>{w.name}</option>
+                                                            <option key={w.id} value={w.name}>{w.name}</option>
                                                         ))}
                                                     </select>
                                                 </div>
