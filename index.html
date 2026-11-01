@@ -106,6 +106,16 @@
                 showToast(newJob.type === 'Incident Report' ? "Incident logged successfully!" : "New job created successfully!");
             };
 
+            const handleCompleteJob = (jobId) => {
+                setJobs(jobs.map(j => {
+                    if (j.id === jobId) {
+                        return { ...j, status: 'Completed' };
+                    }
+                    return j;
+                }));
+                showToast("Task marked as completed!");
+            };
+
             const handleSaveEditJob = (e) => {
                 e.preventDefault();
                 if (!editingJob) return;
@@ -248,7 +258,7 @@
                         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center flex-wrap gap-2">
                             <div className="flex items-center space-x-2">
                                 <span className="text-2xl font-black tracking-tight">FieldJob & Incident Log</span>
-                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Priority Sorting Active</span>
+                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Complete Actions Active</span>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button 
@@ -422,8 +432,9 @@
                                     ) : (
                                         sortedJobs.map(job => {
                                             const isIncident = job.type === 'Incident Report';
+                                            const isCompleted = job.status === 'Completed';
                                             return (
-                                                <div key={job.id} className={`border rounded-xl p-4 transition bg-white shadow-xs ${isIncident ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200 hover:border-emerald-300'}`}>
+                                                <div key={job.id} className={`border rounded-xl p-4 transition bg-white shadow-xs ${isCompleted ? 'border-emerald-200 bg-emerald-50/10 opacity-75' : isIncident ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200 hover:border-emerald-300'}`}>
                                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                         <div>
                                                             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
@@ -438,10 +449,11 @@
                                                                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
                                                                     job.status === 'Pending' ? 'bg-slate-100 text-slate-600' :
                                                                     job.status === 'Allocated' ? 'bg-emerald-100 text-emerald-800' :
+                                                                    job.status === 'Completed' ? 'bg-emerald-600 text-white' :
                                                                     job.status === 'Logged Only' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
                                                                 }`}>{job.status}</span>
                                                             </div>
-                                                            <h3 className="font-bold text-slate-900 mt-1 text-base">{job.title}</h3>
+                                                            <h3 className={`font-bold mt-1 text-base ${isCompleted ? 'line-through text-slate-500' : 'text-slate-900'}`}>{job.title}</h3>
                                                             <p className="text-xs text-slate-600">🏢 {job.client} • 📍 {job.location}</p>
                                                             
                                                             {/* Assigned Team List */}
@@ -463,10 +475,18 @@
 
                                                         {/* Control Buttons */}
                                                         <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-center">
+                                                            {!isIncident && !isCompleted && (
+                                                                <button 
+                                                                    onClick={() => handleCompleteJob(job.id)}
+                                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-xs transition"
+                                                                >
+                                                                    ✅ Complete
+                                                                </button>
+                                                            )}
                                                             {!isIncident && (
                                                                 <button 
                                                                     onClick={() => openAllocationModal(job)}
-                                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-xs transition"
+                                                                    className="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3 py-2 rounded-xl shadow-xs transition"
                                                                 >
                                                                     ⚙️ Assign Team
                                                                 </button>
