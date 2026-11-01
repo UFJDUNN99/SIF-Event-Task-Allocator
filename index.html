@@ -51,7 +51,7 @@
             const [newWorker, setNewWorker] = React.useState({ name: '', phone: '', department: 'Operational' });
             
             // Sorting State
-            const [prioritySortOrder, setPrioritySortOrder] = React.useState('none'); // 'none', 'highest', 'lowest'
+            const [prioritySortOrder, setPrioritySortOrder] = React.useState('none');
 
             // Edit Job Modal State
             const [editingJob, setEditingJob] = React.useState(null);
@@ -117,6 +117,17 @@
                 showToast("Task status updated!");
             };
 
+            // Simulate Worker Replying "ACK" to Accept Job
+            const simulateWorkerAcceptance = (jobId) => {
+                setJobs(jobs.map(j => {
+                    if (j.id === jobId) {
+                        return { ...j, status: 'Accepted' };
+                    }
+                    return j;
+                }));
+                showToast("Worker confirmed acceptance (ACK received)!");
+            };
+
             const handleSaveEditJob = (e) => {
                 e.preventDefault();
                 if (!editingJob) return;
@@ -124,7 +135,7 @@
                 let updatedStatus = editingJob.status;
                 if (editingJob.type === 'Incident Report') {
                     updatedStatus = 'Logged Only';
-                } else if (editingJob.status !== 'Completed') {
+                } else if (editingJob.status !== 'Completed' && editingJob.status !== 'Accepted') {
                     updatedStatus = editingJob.assignedWorkers.length > 0 ? 'Allocated' : 'Pending';
                 }
 
@@ -198,7 +209,7 @@
             const triggerWhatsAppGroup = (job) => {
                 const dispatches = job.assignedWorkers.map(w => {
                     const message = `📋 *NEW JOB ALLOCATED*\n\n*Task:* ${job.title}\n*Client:* ${job.client}\n*Location:* ${job.location}\n*Priority:* ${job.priority}\n*Team Members:* ${job.assignedWorkers.map(x => x.name).join(', ')}\n\nPlease reply ACK to accept.`;
-                    return { worker: w.name, phone: w.phone, message };
+                    return { jobId: job.id, worker: w.name, phone: w.phone, message };
                 });
 
                 setSelectedWhatsAppList(dispatches);
@@ -270,7 +281,7 @@
                         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center flex-wrap gap-2">
                             <div className="flex items-center space-x-2">
                                 <span className="text-2xl font-black tracking-tight">FieldJob & Incident Log</span>
-                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">New Job Layout Active</span>
+                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Acceptance Tracking Active</span>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button 
@@ -291,10 +302,10 @@
                     )}
 
                     <main className="max-w-7xl mx-auto px-4 mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Left Column: Management Cards (Ordered Top to Bottom) */}
+                        {/* Left Column: Management Cards */}
                         <div className="space-y-6">
 
-                            {/* 1. New Job Entry Card (Top Position) */}
+                            {/* 1. New Job Entry Card */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                     <span className="bg-emerald-100 text-emerald-800 p-2 rounded-lg mr-2 text-sm">📝</span>
@@ -339,7 +350,7 @@
                                 </form>
                             </div>
 
-                            {/* 2. Add Worker Directory Card (Middle Position) */}
+                            {/* 2. Add Worker Directory Card */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                                     <span className="bg-blue-100 text-blue-800 p-2 rounded-lg mr-2 text-sm">👷</span>
@@ -383,7 +394,7 @@
                                 </div>
                             </div>
 
-                            {/* 3. Manage Departments Card (Bottom Position) */}
+                            {/* 3. Manage Departments Card */}
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <h2 className="text-lg font-bold text-slate-800 mb-3 flex items-center">
                                     <span className="bg-purple-100 text-purple-800 p-2 rounded-lg mr-2 text-sm">🏢</span>
@@ -463,8 +474,11 @@
                                                                 }`}>{job.priority}</span>
                                                                 <span className="text-xs font-semibold text-slate-400">ID: #{job.id.toString().slice(-4)}</span>
                                                                 <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
-                                                                    job.status === 'Pending' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-100 text-emerald-800'
-                                                                }`}>{job.status}</span>
+                                                                    job.status === 'Pending' ? 'bg-slate-100 text-slate-600' :
+                                                                    job.status === 'Accepted' ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-800'
+                                                                }`}>
+                                                                    {job.status === 'Accepted' ? '✅ Accepted by Worker' : job.status}
+                                                                </span>
                                                             </div>
                                                             <h3 className="font-bold text-slate-900 mt-1 text-base">{job.title}</h3>
                                                             <p className="text-xs text-slate-600">🏢 {job.client} • 📍 {job.location}</p>
@@ -474,7 +488,7 @@
                                                                     <span className="text-xs font-bold text-slate-500 mr-1">Assigned Team:</span>
                                                                     {job.assignedWorkers.map(w => (
                                                                         <span key={w.phone} className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs px-2 py-0.5 rounded-md font-semibold">
-                                                                            👤 {w.name} ({w.department})
+                                                                            👤 {w.name} ({w.department}) {job.status === 'Accepted' ? '✓' : ''}
                                                                         </span>
                                                                     ))}
                                                                 </div>
@@ -617,7 +631,7 @@
                                 </div>
                             </div>
 
-                            {/* WhatsApp Outbox Preview */}
+                            {/* WhatsApp Outbox Preview with Acceptance Simulation */}
                             {selectedWhatsAppList && (
                                 <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl">
                                     <h3 className="text-sm font-bold text-emerald-900 uppercase tracking-wide mb-3 flex items-center">
@@ -630,13 +644,21 @@
                                                     <p className="text-xs font-bold text-slate-800">To: {item.worker} <span className="font-mono text-slate-500">({item.phone})</span></p>
                                                     <p className="text-xs text-slate-600 mt-1 italic font-mono bg-slate-50 p-2 rounded border border-slate-100">{item.message}</p>
                                                 </div>
-                                                <a 
-                                                    href={`https://wa.me/${item.phone.replace('+', '')}?text=${encodeURIComponent(item.message)}`} 
-                                                    target="_blank" 
-                                                    className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-700 whitespace-nowrap"
-                                                >
-                                                    Send to {item.worker} ↗
-                                                </a>
+                                                <div className="flex flex-col gap-1.5 whitespace-nowrap">
+                                                    <a 
+                                                        href={`https://wa.me/${item.phone.replace('+', '')}?text=${encodeURIComponent(item.message)}`} 
+                                                        target="_blank" 
+                                                        className="bg-emerald-600 text-white text-xs px-3 py-2 rounded-lg font-bold hover:bg-emerald-700 text-center"
+                                                    >
+                                                        Send WhatsApp ↗
+                                                    </a>
+                                                    <button 
+                                                        onClick={() => simulateWorkerAcceptance(item.jobId)}
+                                                        className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold hover:bg-blue-700 transition"
+                                                    >
+                                                        Simulate Worker Reply (ACK)
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
