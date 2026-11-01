@@ -50,6 +50,9 @@
             const [newJob, setNewJob] = React.useState({ title: '', client: '', location: '', priority: 'Medium', type: 'Job Assignment' });
             const [newWorker, setNewWorker] = React.useState({ name: '', phone: '', department: 'Operational' });
             
+            // Sorting State
+            const [prioritySortOrder, setPrioritySortOrder] = React.useState('none'); // 'none', 'highest', 'lowest'
+
             // Edit Job Modal State
             const [editingJob, setEditingJob] = React.useState(null);
 
@@ -107,7 +110,6 @@
                 e.preventDefault();
                 if (!editingJob) return;
                 
-                // Keep status correct if type changed
                 const updatedStatus = editingJob.type === 'Incident Report' ? 'Logged Only' : (editingJob.assignedWorkers.length > 0 ? 'Allocated' : 'Pending');
                 const finalJob = { ...editingJob, status: updatedStatus };
 
@@ -228,6 +230,17 @@
 
             const activeAllocatingJob = jobs.find(j => j.id === allocatingJobId);
 
+            // Sorting logic for priorities
+            const priorityWeight = { 'Urgent': 4, 'High': 3, 'Medium': 2, 'Normal': 1 };
+            const sortedJobs = [...jobs].sort((a, b) => {
+                if (prioritySortOrder === 'highest') {
+                    return (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0);
+                } else if (prioritySortOrder === 'lowest') {
+                    return (priorityWeight[a.priority] || 0) - (priorityWeight[b.priority] || 0);
+                }
+                return 0; // default order
+            });
+
             return (
                 <div className="min-h-screen pb-12">
                     {/* Header */}
@@ -235,7 +248,7 @@
                         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center flex-wrap gap-2">
                             <div className="flex items-center space-x-2">
                                 <span className="text-2xl font-black tracking-tight">FieldJob & Incident Log</span>
-                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Standard Depts Active</span>
+                                <span className="bg-emerald-600 text-xs px-2.5 py-1 rounded-full uppercase tracking-wider font-bold">Priority Sorting Active</span>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <button 
@@ -382,19 +395,32 @@
                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                                 <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                                     <h2 className="text-lg font-bold text-slate-800">Outstanding Tasks & Incident Logs</h2>
-                                    <div className="flex items-center space-x-2">
-                                        <button onClick={downloadCSVReport} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-lg border border-slate-300 transition">
+                                    <div className="flex items-center space-x-2 flex-wrap gap-2">
+                                        {/* Priority Sorting Selector */}
+                                        <div className="flex items-center space-x-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1 text-xs">
+                                            <span className="font-bold text-slate-500">Sort:</span>
+                                            <select 
+                                                value={prioritySortOrder} 
+                                                onChange={e => setPrioritySortOrder(e.target.value)}
+                                                className="bg-transparent font-bold text-slate-700 outline-none cursor-pointer"
+                                            >
+                                                <option value="none">Default Order</option>
+                                                <option value="highest">⚠️ Urgent First</option>
+                                                <option value="lowest">🟢 Lowest Priority First</option>
+                                            </select>
+                                        </div>
+
+                                        <button onClick={downloadCSVReport} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl border border-slate-300 transition">
                                             📥 Download Report CSV
                                         </button>
-                                        <span className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold">{jobs.length} Total</span>
                                     </div>
                                 </div>
 
                                 <div className="space-y-3">
-                                    {jobs.length === 0 ? (
+                                    {sortedJobs.length === 0 ? (
                                         <div className="p-8 text-center text-slate-400 font-medium">No records found. Create a job or incident log on the left!</div>
                                     ) : (
-                                        jobs.map(job => {
+                                        sortedJobs.map(job => {
                                             const isIncident = job.type === 'Incident Report';
                                             return (
                                                 <div key={job.id} className={`border rounded-xl p-4 transition bg-white shadow-xs ${isIncident ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200 hover:border-emerald-300'}`}>
